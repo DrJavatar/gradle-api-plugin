@@ -27,7 +27,7 @@ dependencies {
     implementation(kotlin("stdlib"))
     implementation(kotlin("gradle-plugin"))
     implementation("org.jetbrains.kotlin:kotlin-gradle-plugin:1.5.21")
-    runtimeOnly("org.openjfx:javafx-plugin:0.0.10")
+    implementation("org.openjfx:javafx-plugin:0.0.10")
     testImplementation("org.junit.jupiter:junit-jupiter-api:5.3.1")
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.3.1")
 }
@@ -37,7 +37,7 @@ tasks.withType<Test> {
 }
 
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
-    targetCompatibility = "16"
+    targetCompatibility = "11"
 }
 
 publishing {
@@ -47,7 +47,7 @@ publishing {
         }
         repositories {
             maven {
-                url = uri("http://legionkt.com:8085/repository/rsps-studios-private/")
+                url = uri("http://legionkt.com:8085/repository/maven-snapshots/")
                 isAllowInsecureProtocol = true
                 credentials {
                     username = project.properties["myNexusUsername"] as String
