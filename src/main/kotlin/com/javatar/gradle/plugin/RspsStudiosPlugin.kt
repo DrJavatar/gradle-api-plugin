@@ -1,20 +1,24 @@
 package com.javatar.gradle.plugin
 
 import com.javatar.gradle.plugin.configurations.RspsStudiosPluginConfiguration
-import com.javatar.gradle.plugin.tasks.AssemblePluginTask
-import com.javatar.gradle.plugin.tasks.PluginTask
 import com.javatar.gradle.plugin.tasks.RunIDETask
 import org.gradle.api.Plugin
 import org.gradle.api.Project
+import org.gradle.api.plugins.JavaLibraryPlugin
 import org.gradle.api.tasks.Copy
-import org.gradle.internal.impldep.org.codehaus.plexus.util.Os
 import org.gradle.jvm.tasks.Jar
+import org.gradle.tooling.provider.model.ToolingModelBuilderRegistry
+import org.jetbrains.kotlin.gradle.internal.Kapt3GradleSubplugin
+import org.jetbrains.kotlin.gradle.model.Kapt
 import org.openjfx.gradle.JavaFXOptions
+import org.openjfx.gradle.JavaFXPlugin
 import java.io.File
-import java.nio.file.Path
+import javax.inject.Inject
 
-class RspsStudiosPlugin : Plugin<Project> {
+class RspsStudiosPlugin @Inject internal constructor(private val registry: ToolingModelBuilderRegistry) : Plugin<Project> {
+
     override fun apply(target: Project) {
+        val config = target.extensions.create("rsdeplugin", RspsStudiosPluginConfiguration::class.java)
         with(target.repositories) {
             maven {
                 it.setUrl("http://legionkt.com:8085/repository/maven-public/")
@@ -25,23 +29,31 @@ class RspsStudiosPlugin : Plugin<Project> {
             }
         }
 
-        target.pluginManager.apply("org.jetbrains.kotlin.kapt")
-        target.pluginManager.apply("org.openjfx.javafxplugin")
-        target.pluginManager.apply("java-library")
+        target.pluginManager.apply(JavaFXPlugin::class.java)
+        target.pluginManager.apply(JavaLibraryPlugin::class.java)
+        target.pluginManager.apply(Kapt3GradleSubplugin::class.java)
+
+
 
         target.extensions.configure<JavaFXOptions>("javafx") {
+            it.version = "16"
             it.modules(
                 "javafx.base",
                 "javafx.controls",
                 "javafx.graphics",
                 "javafx.fxml",
-                "javafx.web"
+                "javafx.web",
+                "javafx.swing"
             )
         }
 
         with(target.dependencies) {
             add(
-                "implementation",
+                "compileOnly",
+                "org.jetbrains.kotlin:kotlin-reflect:1.5.21"
+            )
+            add(
+                "compileOnly",
                 "com.javatar:api:0.1-SNAPSHOT"
             )
             add(
@@ -73,12 +85,10 @@ class RspsStudiosPlugin : Plugin<Project> {
                 "org.pf4j:pf4j:3.6.0"
             )
             add(
-                "kotlinKaptWorkerDependencies",
+                "kapt",
                 "org.pf4j:pf4j:3.6.0"
             )
         }
-
-        val config = target.extensions.create("rsdeplugin", RspsStudiosPluginConfiguration::class.java)
 
         target.tasks.named("jar", Jar::class.java) {
             it.manifest { m ->
@@ -95,55 +105,33 @@ class RspsStudiosPlugin : Plugin<Project> {
             target.configurations.named("api").get().extendsFrom(it)
         }
 
-        target.tasks.create("plugin", PluginTask::class.java, target, config)
-        target.tasks.create("assemblePlugin", AssemblePluginTask::class.java, target, config)
-        target.tasks.create("runIDE", RunIDETask::class.java, target, config)
-
-    }
-
-    private fun Project.testPluginTask(config: RspsStudiosPluginConfiguration) {
-        tasks.register("runIDE") {
-            val dir = config.rsdeDirectory.get()
-            val bin = Path.of(dir, "bin")
-            if(Os.isFamily(Os.FAMILY_WINDOWS)) {
-                val app = bin.resolve("application.bat").toAbsolutePath().toString()
-                Runtime.getRuntime().exec(app)
-            } else if(Os.isFamily(Os.FAMILY_MAC) || Os.isFamily(Os.FAMILY_UNIX)) {
-                val app = bin.resolve("application")
-                Runtime.getRuntime().exec("./$app")
-            }
-        }
-    }
-
-    private fun Project.assemblePluginTask(config: RspsStudiosPluginConfiguration) {
-
-
-        tasks.register("assemblePlugin", Copy::class.java) { cp ->
-            cp.from(tasks.named("plugin"))
-            val file = File(config.pluginDirectory.get())
-            file.listFiles()?.map { it.deleteRecursively() }
-            cp.into(file)
-        }
-
-    }
-
-    private fun Project.pluginTask(config: RspsStudiosPluginConfiguration) {
-
-        tasks.register("plugin", Jar::class.java) {
-            it.archiveBaseName.set("plugin-${config.pluginId}")
-            it.archiveVersion.set(config.pluginVersion)
+        target.tasks.register("plugin", Jar::class.java) {
+            it.dependsOn(
+                target.tasks.named("build"),
+                target.configurations.getAt("runtimeClasspath")
+            )
+            it.archiveBaseName.set("plugin-${config.pluginId.get()}")
+            it.archiveVersion.set(config.pluginVersion.get())
+            it.archiveExtension.set("zip")
             it.into("classes") { cs ->
-                cs.with(tasks.named("jar", Jar::class.java).get())
+                cs.with(target.tasks.named("jar", Jar::class.java).get())
             }
-            it.dependsOn(configurations.getAt("runtimeClasspath"))
             it.into("lib") { cs ->
                 cs.from({
-                    configurations.named("plugin").get().filter { s -> s.name.endsWith("jar") }
+                    target.configurations.named("plugin").get().filter { s -> s.name.endsWith("jar") }
                 })
             }
-            it.archiveExtension.set("zip")
         }
-
+        target.tasks.register("assemblePlugin", Copy::class.java) {
+            it.dependsOn(target.tasks.named("plugin"))
+            it.from(target.tasks.named("plugin"))
+            val file = File(config.pluginDirectory.get())
+            file.listFiles()?.map { f -> f.deleteRecursively() }
+            it.into(file)
+        }
+        target.tasks.register("runIDE", RunIDETask::class.java) {
+            it.dependsOn(target.tasks.named("assemblePlugin"))
+            it.config.set(config)
+        }
     }
-
 }

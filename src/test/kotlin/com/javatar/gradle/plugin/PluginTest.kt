@@ -1,12 +1,12 @@
 package com.javatar.gradle.plugin
 
 import com.javatar.gradle.plugin.configurations.RspsStudiosPluginConfiguration
+import org.gradle.internal.impldep.org.junit.Ignore
 import org.gradle.testfixtures.ProjectBuilder
 import org.junit.jupiter.api.Test
 
 class PluginTest {
 
-    @Test
     fun test() {
 
         val target = ProjectBuilder.builder().build()

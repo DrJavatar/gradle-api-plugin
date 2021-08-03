@@ -23,11 +23,12 @@ gradlePlugin {
     }
 }
 
+
 dependencies {
     implementation(kotlin("stdlib"))
     implementation(kotlin("gradle-plugin"))
-    implementation("org.jetbrains.kotlin:kotlin-gradle-plugin:1.5.21")
     implementation("org.openjfx:javafx-plugin:0.0.10")
+    implementation("org.zeroturnaround:zt-exec:1.12")
     testImplementation("org.junit.jupiter:junit-jupiter-api:5.3.1")
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.3.1")
 }
